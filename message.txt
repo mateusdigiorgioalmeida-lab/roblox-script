@@ -1,0 +1,655 @@
+-- LocalScript dentro de StarterGui
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- ==================== VARIÁVEIS GLOBAIS ====================
+local flying = false
+local speeding = false
+local noclipping = false
+
+local flySpeed = 50
+local maxFlySpeed = 200
+local speedIncrement = 10
+
+local normalWalkSpeed = 16
+local customWalkSpeed = 100
+local maxWalkSpeed = 300
+
+local bodyVelocity = nil
+local bodyGyro = nil
+local flyConnection = nil
+
+-- ==================== CRIAR SCREEN GUI ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SuperHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- ==================== PAINEL PRINCIPAL (ARRASTRÁVEL) ====================
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 400, 0, 600)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -300)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 15)
+frameCorner.Parent = mainFrame
+
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(0, 200, 255)
+frameStroke.Thickness = 3
+frameStroke.Parent = mainFrame
+
+-- Sombra
+local shadow = Instance.new("Frame")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(1, 20, 1, 20)
+shadow.Position = UDim2.new(0, -10, 0, -10)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.5
+shadow.BorderSizePixel = 0
+shadow.ZIndex = 0
+shadow.Parent = mainFrame
+
+local shadowCorner = Instance.new("UICorner")
+shadowCorner.CornerRadius = UDim.new(0, 15)
+shadowCorner.Parent = shadow
+
+mainFrame.ZIndex = 1
+
+-- ==================== HEADER (ARRASTRÁVEL) ====================
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 60)
+header.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+header.BorderSizePixel = 0
+header.Parent = mainFrame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 15)
+headerCorner.Parent = header
+
+-- Gradiente do Header
+local headerGradient = Instance.new("UIGradient")
+headerGradient.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255), Color3.fromRGB(0, 100, 200))
+headerGradient.Parent = header
+
+-- Título
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, -60, 1, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 22
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Text = "⚡ MEGA HUB"
+titleLabel.Parent = header
+
+-- Botão Minimizar
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Name = "MinimizeButton"
+minimizeButton.Size = UDim2.new(0, 45, 0, 45)
+minimizeButton.Position = UDim2.new(1, -50, 0, 7)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.TextSize = 20
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.Text = "−"
+minimizeButton.BorderSizePixel = 0
+minimizeButton.Parent = header
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.CornerRadius = UDim.new(0, 8)
+minimizeCorner.Parent = minimizeButton
+
+-- ==================== CONTAINER DE ABAS ====================
+local tabContainer = Instance.new("Frame")
+tabContainer.Name = "TabContainer"
+tabContainer.Size = UDim2.new(1, 0, 0, 50)
+tabContainer.Position = UDim2.new(0, 0, 0, 60)
+tabContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+tabContainer.BorderSizePixel = 0
+tabContainer.Parent = mainFrame
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 2)
+tabLayout.Parent = tabContainer
+
+-- ==================== CRIAR ABAS ====================
+local tabs = {}
+local tabButtons = {}
+
+local function createTab(tabName)
+    -- Botão da Aba
+    local tabButton = Instance.new("TextButton")
+    tabButton.Name = tabName .. "Button"
+    tabButton.Size = UDim2.new(0, 120, 1, 0)
+    tabButton.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    tabButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+    tabButton.TextSize = 12
+    tabButton.Font = Enum.Font.GothamBold
+    tabButton.Text = tabName
+    tabButton.BorderSizePixel = 0
+    tabButton.Parent = tabContainer
+    
+    local tabButtonCorner = Instance.new("UICorner")
+    tabButtonCorner.CornerRadius = UDim.new(0, 6)
+    tabButtonCorner.Parent = tabButton
+    
+    -- Conteúdo da Aba
+    local tabContent = Instance.new("Frame")
+    tabContent.Name = tabName .. "Content"
+    tabContent.Size = UDim2.new(1, 0, 1, -110)
+    tabContent.Position = UDim2.new(0, 0, 0, 110)
+    tabContent.BackgroundTransparency = 1
+    tabContent.BorderSizePixel = 0
+    tabContent.Visible = false
+    tabContent.Parent = mainFrame
+    
+    local contentLayout = Instance.new("UIListLayout")
+    contentLayout.Padding = UDim.new(0, 10)
+    contentLayout.FillDirection = Enum.FillDirection.Vertical
+    contentLayout.Parent = tabContent
+    
+    tabs[tabName] = tabContent
+    tabButtons[tabName] = tabButton
+    
+    return tabButton, tabContent
+end
+
+-- Criar as três abas
+local flyButton, flyContent = createTab("FLY")
+local speedButton, speedContent = createTab("SPEED")
+local noclipButton, noclipContent = createTab("NOCLIP")
+
+-- ==================== FUNÇÃO PARA TROCAR ABAS ====================
+local currentTab = "FLY"
+
+local function switchTab(tabName)
+    for name, content in pairs(tabs) do
+        content.Visible = (name == tabName)
+    end
+    
+    for name, button in pairs(tabButtons) do
+        if name == tabName then
+            button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            button.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+            button.TextColor3 = Color3.fromRGB(150, 150, 150)
+        end
+    end
+    
+    currentTab = tabName
+end
+
+-- Conectar botões de abas
+for tabName, button in pairs(tabButtons) do
+    button.MouseButton1Click:Connect(function()
+        switchTab(tabName)
+    end)
+end
+
+-- ==================== ABA FLY ====================
+local function createLabel(text, parent)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 30)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 12
+    label.Font = Enum.Font.Gotham
+    label.Text = text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+local function createButton(text, parent, size)
+    size = size or UDim2.new(1, -20, 0, 45)
+    
+    local button = Instance.new("TextButton")
+    button.Size = size
+    button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 14
+    button.Font = Enum.Font.GothamBold
+    button.Text = text
+    button.BorderSizePixel = 0
+    button.Parent = parent
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
+    
+    return button
+end
+
+-- Status Fly
+local flyStatusLabel = createLabel("🟢 Status: OFF", flyContent)
+
+-- Botão Ativar/Desativar Fly
+local activateFlyButton = createButton("▶ ATIVAR VOO", flyContent)
+
+-- Velocidade Fly
+createLabel("Velocidade: 50 / 200", flyContent)
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Size = UDim2.new(1, -20, 0, 25)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+flySpeedLabel.TextSize = 16
+flySpeedLabel.Font = Enum.Font.GothamBold
+flySpeedLabel.Text = "🚀 " .. flySpeed
+flySpeedLabel.Parent = flyContent
+
+-- Botões de Velocidade
+local flySpeedUpButton = createButton("➕ AUMENTAR", flyContent, UDim2.new(0.45, -10, 0, 40))
+local flySpeedDownButton = createButton("➖ DIMINUIR", flyContent, UDim2.new(0.45, 10, 0, 40))
+
+-- Layout para botões lado a lado
+local flySpeedButtonsContainer = Instance.new("Frame")
+flySpeedButtonsContainer.Size = UDim2.new(1, -20, 0, 40)
+flySpeedButtonsContainer.BackgroundTransparency = 1
+flySpeedButtonsContainer.Parent = flyContent
+
+flySpeedUpButton.Parent = flySpeedButtonsContainer
+flySpeedDownButton.Parent = flySpeedButtonsContainer
+flySpeedUpButton.Position = UDim2.new(0, 0, 0, 0)
+flySpeedDownButton.Position = UDim2.new(0.55, 0, 0, 0)
+flySpeedUpButton.Size = UDim2.new(0.45, 0, 1, 0)
+flySpeedDownButton.Size = UDim2.new(0.45, 0, 1, 0)
+
+-- ==================== ABA SPEED ====================
+local speedStatusLabel = createLabel("🟢 Status: OFF", speedContent)
+local activateSpeedButton = createButton("▶ ATIVAR SPEED", speedContent)
+
+createLabel("Velocidade de Caminhada: 100 / 300", speedContent)
+local speedValueLabel = Instance.new("TextLabel")
+speedValueLabel.Size = UDim2.new(1, -20, 0, 25)
+speedValueLabel.BackgroundTransparency = 1
+speedValueLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+speedValueLabel.TextSize = 16
+speedValueLabel.Font = Enum.Font.GothamBold
+speedValueLabel.Text = "🏃 " .. customWalkSpeed
+speedValueLabel.Parent = speedContent
+
+-- Botões de Velocidade Speed
+local speedSpeedUpButton = createButton("➕ AUMENTAR", speedContent, UDim2.new(0.45, -10, 0, 40))
+local speedSpeedDownButton = createButton("➖ DIMINUIR", speedContent, UDim2.new(0.45, 10, 0, 40))
+
+local speedSpeedButtonsContainer = Instance.new("Frame")
+speedSpeedButtonsContainer.Size = UDim2.new(1, -20, 0, 40)
+speedSpeedButtonsContainer.BackgroundTransparency = 1
+speedSpeedButtonsContainer.Parent = speedContent
+
+speedSpeedUpButton.Parent = speedSpeedButtonsContainer
+speedSpeedDownButton.Parent = speedSpeedButtonsContainer
+speedSpeedUpButton.Position = UDim2.new(0, 0, 0, 0)
+speedSpeedDownButton.Position = UDim2.new(0.55, 0, 0, 0)
+speedSpeedUpButton.Size = UDim2.new(0.45, 0, 1, 0)
+speedSpeedDownButton.Size = UDim2.new(0.45, 0, 1, 0)
+
+-- ==================== ABA NOCLIP ====================
+local noclipStatusLabel = createLabel("🟢 Status: OFF", noclipContent)
+local activateNoclipButton = createButton("▶ ATIVAR NOCLIP", noclipContent)
+
+local noclipInfoLabel = createLabel("Clique para atravessar paredes", noclipContent)
+noclipInfoLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+
+-- ==================== FUNÇÕES DE VOO ====================
+local function updateFlyStatus()
+    if flying then
+        flyStatusLabel.Text = "🔴 Status: VOANDO"
+        flyStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        activateFlyButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+        activateFlyButton.Text = "⏹ PARAR VOO"
+    else
+        flyStatusLabel.Text = "🟢 Status: OFF"
+        flyStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        activateFlyButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        activateFlyButton.Text = "▶ ATIVAR VOO"
+    end
+    flySpeedLabel.Text = "🚀 " .. flySpeed
+end
+
+local function startFlying()
+    if flying then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    flying = true
+    updateFlyStatus()
+    
+    -- Remover instâncias antigas
+    if humanoidRootPart:FindFirstChild("BodyVelocity") then
+        humanoidRootPart:FindFirstChild("BodyVelocity"):Destroy()
+    end
+    if humanoidRootPart:FindFirstChild("BodyGyro") then
+        humanoidRootPart:FindFirstChild("BodyGyro"):Destroy()
+    end
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Parent = humanoidRootPart
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 10000
+    bodyGyro.CFrame = humanoidRootPart.CFrame
+    bodyGyro.Parent = humanoidRootPart
+    
+    local camera = workspace.CurrentCamera
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flying or not humanoidRootPart or not humanoidRootPart.Parent then
+            stopFlying()
+            return
+        end
+        
+        local moveDirection = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+        
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit
+        end
+        
+        bodyVelocity.Velocity = moveDirection * flySpeed
+        bodyGyro.CFrame = camera.CFrame
+    end)
+end
+
+function stopFlying()
+    if not flying then return end
+    
+    flying = false
+    
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    
+    updateFlyStatus()
+end
+
+-- ==================== FUNÇÕES DE SPEED ====================
+local function updateSpeedStatus()
+    if speeding then
+        speedStatusLabel.Text = "🔴 Status: ATIVO"
+        speedStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        activateSpeedButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+        activateSpeedButton.Text = "⏹ PARAR SPEED"
+    else
+        speedStatusLabel.Text = "🟢 Status: OFF"
+        speedStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        activateSpeedButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        activateSpeedButton.Text = "▶ ATIVAR SPEED"
+    end
+    speedValueLabel.Text = "🏃 " .. customWalkSpeed
+end
+
+local function startSpeed()
+    if speeding then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    speeding = true
+    humanoid.WalkSpeed = customWalkSpeed
+    updateSpeedStatus()
+end
+
+local function stopSpeed()
+    if not speeding then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    speeding = false
+    humanoid.WalkSpeed = normalWalkSpeed
+    updateSpeedStatus()
+end
+
+-- ==================== FUNÇÕES DE NOCLIP ====================
+local noclipConnection = nil
+
+local function updateNoclipStatus()
+    if noclipping then
+        noclipStatusLabel.Text = "🔴 Status: ATIVO"
+        noclipStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        activateNoclipButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+        activateNoclipButton.Text = "⏹ PARAR NOCLIP"
+    else
+        noclipStatusLabel.Text = "🟢 Status: OFF"
+        noclipStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        activateNoclipButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        activateNoclipButton.Text = "▶ ATIVAR NOCLIP"
+    end
+end
+
+local function startNoclip()
+    if noclipping then return end
+    
+    noclipping = true
+    updateNoclipStatus()
+    
+    noclipConnection = RunService.Stepped:Connect(function()
+        if not noclipping then return end
+        
+        local character = player.Character
+        if not character then return end
+        
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+local function stopNoclip()
+    if not noclipping then return end
+    
+    noclipping = false
+    
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    
+    local character = player.Character
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+    
+    updateNoclipStatus()
+end
+
+-- ==================== EVENTOS DOS BOTÕES ====================
+activateFlyButton.MouseButton1Click:Connect(function()
+    if flying then
+        stopFlying()
+    else
+        startFlying()
+    end
+end)
+
+flySpeedUpButton.MouseButton1Click:Connect(function()
+    if flySpeed < maxFlySpeed then
+        flySpeed = flySpeed + speedIncrement
+        updateFlyStatus()
+    end
+end)
+
+flySpeedDownButton.MouseButton1Click:Connect(function()
+    if flySpeed > speedIncrement then
+        flySpeed = flySpeed - speedIncrement
+        updateFlyStatus()
+    end
+end)
+
+activateSpeedButton.MouseButton1Click:Connect(function()
+    if speeding then
+        stopSpeed()
+    else
+        startSpeed()
+    end
+end)
+
+speedSpeedUpButton.MouseButton1Click:Connect(function()
+    if customWalkSpeed < maxWalkSpeed then
+        customWalkSpeed = customWalkSpeed + 10
+        if speeding then
+            local character = player.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = customWalkSpeed
+                end
+            end
+        end
+        updateSpeedStatus()
+    end
+end)
+
+speedSpeedDownButton.MouseButton1Click:Connect(function()
+    if customWalkSpeed > 16 then
+        customWalkSpeed = customWalkSpeed - 10
+        if speeding then
+            local character = player.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = customWalkSpeed
+                end
+            end
+        end
+        updateSpeedStatus()
+    end
+end)
+
+activateNoclipButton.MouseButton1Click:Connect(function()
+    if noclipping then
+        stopNoclip()
+    else
+        startNoclip()
+    end
+end)
+
+-- ==================== FUNCIONALIDADE DE ARRASTAR ====================
+local dragging = false
+local dragStart
+local startPos
+
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+header.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ==================== BOTÃO MINIMIZAR ====================
+local minimized = false
+
+minimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    
+    if minimized then
+        mainFrame.Size = UDim2.new(0, 400, 0, 60)
+        minimizeButton.Text = "+"
+        tabContainer.Visible = false
+        for _, content in pairs(tabs) do
+            content.Visible = false
+        end
+    else
+        mainFrame.Size = UDim2.new(0, 400, 0, 600)
+        minimizeButton.Text = "−"
+        tabContainer.Visible = true
+        switchTab(currentTab)
+    end
+end)
+
+-- ==================== LIMPEZA QUANDO MORRE ====================
+player.CharacterAdded:Connect(function()
+    stopFlying()
+    stopSpeed()
+    stopNoclip()
+end)
+
+-- ==================== INICIALIZAR ====================
+switchTab("FLY")
+updateFlyStatus()
+updateSpeedStatus()
+updateNoclipStatus()
+
+print("✅ MEGA HUB CARREGADO COM SUCESSO!")
+print("🎮 Controles: WASD + SPACE + SHIFT para voar")
+print("📍 Arraste pelo título para mover o HUB")
